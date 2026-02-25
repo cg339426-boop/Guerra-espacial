@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>WICHE GUERRA ESPACIAL - ULTIMATE</title>
+    <style>
+        * { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; outline: none; -webkit-tap-highlight-color: transparent; }
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Arial Black', sans-serif; touch-action: none; color: #fff; }
+        
+        #ui { position: fixed; top: 15px; left: 20px; font-size: 14px; letter-spacing: 2px; pointer-events: none; z-index: 10; color: #0ff; text-shadow: 0 0 10px #000; }
+        #boss-ui { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); width: 60%; display: none; text-align: center; z-index: 100; }
+        #boss-bar-container { width: 100%; height: 12px; background: rgba(255,0,0,0.2); border: 2px solid #f00; border-radius: 6px; overflow: hidden; }
+        #boss-bar { width: 100%; height: 100%; background: linear-gradient(90deg, #f00, #ff4444); box-shadow: 0 0 15px #f00; transition: width 0.2s; }
+
+        #btn-pause { position: fixed; top: 15px; right: 20px; width: 45px; height: 45px; border: 2px solid #0ff; border-radius: 50%; display: flex; align-items: center; justify-content: center; z-index: 100; background: rgba(0,255,255,0.1); color: #0ff; pointer-events: auto; }
+        #start-screen { position: fixed; inset: 0; background: radial-gradient(circle, #050515 0%, #000 100%); display: flex; z-index: 1000; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; }
+
+        .controls { position: fixed; bottom: 30px; width: 100%; display: flex; justify-content: space-between; padding: 0 25px; box-sizing: border-box; pointer-events: none; z-index: 20; }
+        .btn-group { display: flex; flex-direction: column; gap: 15px; pointer-events: auto; }
+        .btn { width: 60px; height: 60px; background: rgba(0, 255, 255, 0.1); border: 2px solid #0ff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; backdrop-filter: blur(5px); color: #0ff; }
+        
+        #btn-shoot { width: 80px; height: 80px; background: rgba(255, 0, 100, 0.2); border-color: #f0f; box-shadow: 0 0 15px rgba(255,0,100,0.4); margin-top: 75px; }
+        
+        #power-msg { position: fixed; top: 80px; left: 50%; transform: translateX(-50%); color: #ff0; font-size: 18px; display: none; text-shadow: 0 0 10px #ff0; }
+        
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+    </style>
+</head>
+<body>
+
+<div id="start-screen">
+    <h1 style="color: #0ff; text-shadow: 0 0 20px #0ff; text-align:center;">WICHE<br><span style="font-size: 0.6em; color: #fff;">GUERRA ESPACIAL</span></h1>
+    <p style="color: #0ff; letter-spacing: 2px; animation: blink 1s infinite;">TOCA PARA EMPEZAR</p>
+</div>
+
+<div id="boss-ui">
+    <div id="boss-label" style="color:#f00; font-size:14px; margin-bottom:5px; font-weight:bold;">JEFE FINAL: FASE 1</div>
+    <div id="boss-bar-container"><div id="boss-bar"></div></div>
+</div>
+
+<div id="ui">SCORE: <span id="score">00000</span><br>LEVEL: <span id="level">01</span></div>
+<div id="btn-pause">⏸</div>
+<div id="power-msg">¡PODER TRIPLE ACTIVADO!</div>
+
+<div class="controls">
+    <div class="btn-group">
+        <div id="btn-up" class="btn">▲</div>
+        <div id="btn-down" class="btn">▼</div>
+    </div>
+    <div class="btn-group">
+        <div id="btn-shoot" class="btn">⚡</div>
+    </div>
+</div>
+
+<canvas id="gameCanvas"></canvas>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    let audioCtx = null;
+    let score = 0, gameActive = false, isPaused = false, shake = 0;
+    let player = { x: 80, y: 0, w: 60, h: 40, speed: 6.5, lastShot: 0, powerUp: 0 };
+    let bullets = [], enemies = [], stars = [], bossProjectiles = [], powerUps = [], particles = [];
+    let boss = null;
+
+    function resize() {
+        canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+        player.y = canvas.height / 2;
+        stars = Array.from({length: 70}, () => ({ x: Math.random()*canvas.width, y: Math.random()*canvas.height, s: Math.random()*2+1, sp: Math.random()*3+1 }));
+    }
+    window.addEventListener('resize', resize); resize();
+
+    function initAudio() {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+    }
+
+    function playSound(freq, type, dur, vol) {
+        if(!audioCtx || audioCtx.state !== 'running' || isPaused) return;
+        try {
+            const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+            osc.type = type; osc.frequency.value = freq;
+            gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + dur);
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.start(); osc.stop(audioCtx.currentTime + dur);
+        } catch(e) {}
+    }
+
+    function createExplosion(x, y, color) {
+        for(let i=0; i<15; i++) {
+            particles.push({
+                x: x, y: y,
+                vx: (Math.random()-0.5)*12,
+                vy: (Math.random()-0.5)*12,
+                life: 1.0,
+                color: color
+            });
+        }
+    }
+
+    function drawPlayer(x, y) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.scale(1.2, 1.2);
+        let color = player.powerUp > Date.now() ? '#ff0' : '#0ff';
+        ctx.shadowBlur = 15; ctx.shadowColor = color;
+        ctx.fillStyle = color; ctx.globalAlpha = Math.random();
+        ctx.beginPath(); ctx.moveTo(-5, 12); ctx.lineTo(-20, 15); ctx.lineTo(-5, 18); ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = color; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(5, 0); ctx.lineTo(20, 15); ctx.lineTo(5, 30); ctx.stroke();
+        ctx.fillStyle = "#001a1a";
+        ctx.beginPath(); ctx.moveTo(0, 10); ctx.lineTo(45, 15); ctx.lineTo(0, 20); ctx.closePath();
+        ctx.fill(); ctx.stroke();
+        ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+        ctx.beginPath(); ctx.ellipse(15, 15, 10, 5, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+    }
+
+    const bind = (id, fn) => {
+        const el = document.getElementById(id);
+        el.addEventListener('pointerdown', e => { e.preventDefault(); fn(true); });
+        el.addEventListener('pointerup', e => { e.preventDefault(); fn(false); });
+    };
+    let mvUp = false, mvDown = false, isShooting = false;
+    bind('btn-up', v => mvUp = v); bind('btn-down', v => mvDown = v); bind('btn-shoot', v => isShooting = v);
+
+    // Lógica del botón de pausa corregida
+    document.getElementById('btn-pause').onclick = function(e) {
+        e.stopPropagation();
+        isPaused = !isPaused;
+        this.innerText = isPaused ? '▶️' : '⏸';
+    };
+
+    document.getElementById('start-screen').addEventListener('click', function() {
+        initAudio();
+        this.style.display = 'none'; 
+        if (!gameActive) { gameActive = true; requestAnimationFrame(loop); }
+    });
+
+    function gameOver() {
+        gameActive = false;
+        shake = 40;
+        playSound(50, 'sawtooth', 1.2, 0.6);
+        createExplosion(player.x, player.y, '#f00');
+        setTimeout(() => { alert("GAME OVER - SCORE: " + score); location.reload(); }, 300);
+    }
+
+    function update() {
+        if (!gameActive || isPaused) return;
+        if (shake > 0) shake *= 0.9;
+        
+        if (score > 0 && score % 10000 === 0 && !boss) {
+            boss = { x: canvas.width + 150, y: canvas.height/2, hp: 60, maxHp: 60, phase: 1, lastShot: 0 };
+            document.getElementById('boss-ui').style.display = 'block';
+        }
+
+        stars.forEach(s => { s.x -= s.sp; if(s.x < 0) s.x = canvas.width; });
+        if (mvUp && player.y > 20) player.y -= player.speed;
+        if (mvDown && player.y < canvas.height - 50) player.y += player.speed;
+
+        if (isShooting && Date.now() - player.lastShot > (player.powerUp > Date.now() ? 120 : 250)) {
+            bullets.push({ x: player.x + 40, y: player.y + 15, vy: 0 });
+            if(player.powerUp > Date.now()) {
+                bullets.push({ x: player.x + 40, y: player.y + 15, vy: -3 });
+                bullets.push({ x: player.x + 40, y: player.y + 15, vy: 3 });
+            }
+            // SONIDO DE DISPARO ELIMINADO
+            player.lastShot = Date.now();
+        }
+
+        bullets.forEach((b, i) => {
+            b.x += 20; b.y += b.vy;
+            if (boss && Math.hypot(b.x - boss.x, b.y - boss.y) < 60) {
+                boss.hp--; bullets.splice(i, 1); shake = 8;
+                createExplosion(b.x, b.y, '#f00');
+                document.getElementById('boss-bar').style.width = (boss.hp / boss.maxHp * 100) + "%";
+            }
+            if (b.x > canvas.width) bullets.splice(i, 1);
+        });
+
+        if (boss) {
+            if (boss.x > canvas.width - 160) boss.x -= 1.5;
+            boss.y += Math.sin(Date.now() / 800) * (boss.phase === 2 ? 8 : 4);
+            if (Date.now() - boss.lastShot > (boss.phase === 2 ? 600 : 1500)) {
+                bossProjectiles.push({ x: boss.x - 50, y: boss.y, vx: boss.phase === 2 ? -12 : -7 });
+                boss.lastShot = Date.now();
+                playSound(150, 'sawtooth', 0.2, 0.05);
+            }
+            if (boss.hp <= 0) {
+                createExplosion(boss.x, boss.y, '#f00');
+                powerUps.push({x: boss.x, y: boss.y});
+                score += 3000; boss = null; shake = 40;
+                document.getElementById('boss-ui').style.display = 'none';
+                playSound(40, 'square', 1.0, 0.4);
+            }
+        } else {
+            if (Math.random() < 0.03) {
+                enemies.push({ 
+                    x: canvas.width + 50, 
+                    y: Math.random()*(canvas.height-100)+50, 
+                    sp: 5 + (score/3000),
+                    amp: Math.random() < 0.4 ? 4 : 0, 
+                    offset: Math.random() * 10,
+                    rotation: 0 // Nueva propiedad para la rotación
+                });
+            }
+        }
+
+        particles.forEach((p, i) => {
+            p.x += p.vx; p.y += p.vy; p.life -= 0.03;
+            if(p.life <= 0) particles.splice(i, 1);
+        });
+
+        enemies.forEach((e, i) => {
+            e.x -= e.sp;
+            e.y += Math.sin(Date.now() / 200 + e.offset) * e.amp;
+            e.rotation += 0.1; // Los enemigos giran
+
+            if (Math.hypot(player.x - e.x, player.y - e.y) < 35) gameOver();
+            bullets.forEach((b, bi) => {
+                if (Math.hypot(b.x - e.x, b.y - e.y) < 30) { 
+                    shake = 6;
+                    createExplosion(e.x, e.y, '#f0f');
+                    enemies.splice(i, 1); bullets.splice(bi, 1); 
+                    score += 100; // PUNTUACIÓN SUBIDA A 100
+                    playSound(300, 'sine', 0.05, 0.02);
+                }
+            });
+            if(e.x < -50) enemies.splice(i, 1);
+        });
+
+        bossProjectiles.forEach((p, i) => { 
+            p.x += p.vx; 
+            if(Math.hypot(player.x - p.x, player.y - p.y) < 25) gameOver();
+            if(p.x < -50) bossProjectiles.splice(i, 1);
+        });
+
+        powerUps.forEach((p, i) => {
+            p.x -= 3;
+            if(Math.hypot(player.x - p.x, player.y - p.y) < 40) {
+                player.powerUp = Date.now() + 10000; powerUps.splice(i,1);
+                document.getElementById('power-msg').style.display = 'block';
+                setTimeout(()=> document.getElementById('power-msg').style.display='none', 3000);
+                playSound(800, 'sine', 0.6, 0.2);
+            }
+        });
+
+        document.getElementById('score').innerText = score.toString().padStart(5, '0');
+        document.getElementById('level').innerText = Math.floor(score/5000 + 1).toString().padStart(2, '0');
+    }
+
+    function draw() {
+        ctx.fillStyle = '#000814'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.save(); 
+        if(shake > 0) ctx.translate(Math.random()*shake - shake/2, Math.random()*shake - shake/2);
+        
+        ctx.fillStyle = '#fff'; stars.forEach(s => ctx.fillRect(s.x, s.y, s.s, s.s));
+
+        particles.forEach(p => {
+            ctx.fillStyle = p.color; ctx.globalAlpha = p.life;
+            ctx.fillRect(p.x, p.y, 3, 3);
+        });
+        ctx.globalAlpha = 1;
+        
+        bullets.forEach(b => {
+            ctx.fillStyle = player.powerUp > Date.now() ? '#ff0' : '#0ff';
+            ctx.fillRect(b.x, b.y, 15, 4);
+        });
+
+        // ENEMIGOS CON ROTACIÓN
+        enemies.forEach(e => {
+            ctx.save();
+            ctx.translate(e.x, e.y);
+            ctx.rotate(e.rotation); // APLICAR ROTACIÓN
+            ctx.strokeStyle = '#f0f'; ctx.lineWidth = 2; ctx.shadowBlur = 10; ctx.shadowColor = '#f0f';
+            ctx.beginPath();
+            for(let i=0; i<8; i++) {
+                let rot = (Math.PI * 2 / 8) * i;
+                ctx.lineTo(Math.cos(rot) * 20, Math.sin(rot) * 20);
+                ctx.lineTo(Math.cos(rot + 0.4) * 12, Math.sin(rot + 0.4) * 12);
+            }
+            ctx.closePath(); ctx.stroke();
+            ctx.beginPath(); ctx.arc(0, 0, 10, 0, Math.PI*2); ctx.fillStyle = '#000'; ctx.fill(); ctx.stroke();
+            // El ojo se mantiene rotando con el cuerpo
+            ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(-2, 0, 5, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#f0f'; ctx.beginPath(); ctx.arc(-3, 0, 2, 0, Math.PI*2); ctx.fill();
+            ctx.restore();
+        });
+
+        if(boss) {
+            ctx.strokeStyle = '#f00'; ctx.lineWidth = 4; ctx.shadowBlur = 20; ctx.shadowColor = '#f00';
+            ctx.strokeRect(boss.x - 50, boss.y - 50, 100, 100);
+            ctx.strokeRect(boss.x - 30, boss.y - 30, 60, 60);
+        }
+
+        bossProjectiles.forEach(p => {
+            ctx.fillStyle = '#f00'; ctx.shadowBlur = 15; ctx.beginPath(); ctx.arc(p.x, p.y, 10, 0, Math.PI*2); ctx.fill();
+        });
+
+        drawPlayer(player.x, player.y);
+        ctx.restore();
+    }
+
+    function loop() {
+        update();
+        draw();
+        if(gameActive) requestAnimationFrame(loop);
+    }
+</script>
+</body>
+</html>
