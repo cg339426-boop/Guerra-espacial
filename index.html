@@ -2,314 +2,298 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>WICHE GUERRA ESPACIAL - ULTIMATE</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SCANNER PRO V6.0</title>
+    <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
-        * { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; outline: none; -webkit-tap-highlight-color: transparent; }
-        body { margin: 0; overflow: hidden; background: #000; font-family: 'Arial Black', sans-serif; touch-action: none; color: #fff; }
-        
-        #ui { position: fixed; top: 15px; left: 20px; font-size: 14px; letter-spacing: 2px; pointer-events: none; z-index: 10; color: #0ff; text-shadow: 0 0 10px #000; }
-        #boss-ui { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); width: 60%; display: none; text-align: center; z-index: 100; }
-        #boss-bar-container { width: 100%; height: 12px; background: rgba(255,0,0,0.2); border: 2px solid #f00; border-radius: 6px; overflow: hidden; }
-        #boss-bar { width: 100%; height: 100%; background: linear-gradient(90deg, #f00, #ff4444); box-shadow: 0 0 15px #f00; transition: width 0.2s; }
+        :root { --neon: #ff003c; --bg: #000; --card: #111; --success: #00ff66; --text: #fff; }
+        * { box-sizing: border-box; font-family: 'Segoe UI', sans-serif; -webkit-tap-highlight-color: transparent; }
+        body, html { margin: 0; padding: 0; background: var(--bg); color: var(--text); height: 100%; width: 100%; overflow: hidden; }
 
-        #btn-pause { position: fixed; top: 15px; right: 20px; width: 45px; height: 45px; border: 2px solid #0ff; border-radius: 50%; display: flex; align-items: center; justify-content: center; z-index: 100; background: rgba(0,255,255,0.1); color: #0ff; pointer-events: auto; }
-        #start-screen { position: fixed; inset: 0; background: radial-gradient(circle, #050515 0%, #000 100%); display: flex; z-index: 1000; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; }
+        .screen { display: flex; flex-direction: column; height: 100vh; width: 100vw; position: absolute; padding: 15px; background: var(--bg); z-index: 1; }
+        .hidden { display: none !important; }
 
-        .controls { position: fixed; bottom: 30px; width: 100%; display: flex; justify-content: space-between; padding: 0 25px; box-sizing: border-box; pointer-events: none; z-index: 20; }
-        .btn-group { display: flex; flex-direction: column; gap: 15px; pointer-events: auto; }
-        .btn { width: 60px; height: 60px; background: rgba(0, 255, 255, 0.1); border: 2px solid #0ff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; backdrop-filter: blur(5px); color: #0ff; }
+        /* CAMARA */
+        .cam-box { width: 100%; flex: 1; border: 2px solid var(--neon); border-radius: 20px; overflow: hidden; margin-bottom: 80px; }
         
-        #btn-shoot { width: 80px; height: 80px; background: rgba(255, 0, 100, 0.2); border-color: #f0f; box-shadow: 0 0 15px rgba(255,0,100,0.4); margin-top: 75px; }
+        /* INDICADOR DE ESCANEO (NUEVO) */
+        .scan-counter {
+            position: fixed;
+            bottom: 135px;
+            left: 15px;
+            right: 15px;
+            background: rgba(0, 255, 102, 0.2);
+            border: 1px solid var(--success);
+            color: var(--success);
+            padding: 10px;
+            border-radius: 12px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 1.1rem;
+            backdrop-filter: blur(5px);
+            display: flex;
+            justify-content: space-between;
+            z-index: 10;
+        }
+
+        /* TICKET 50/50 HORIZONTAL */
+        .ticket-area { height: 43vh; background: #fff; color: #000; border-radius: 15px; margin-bottom: 10px; display: flex; flex-direction: column; overflow: hidden; }
+        .receipt-list { flex: 1; overflow-y: auto; padding: 10px; font-family: monospace; }
+        .receipt-row { display: flex; justify-content: space-between; border-bottom: 1px solid #ddd; padding: 8px 0; align-items: center; }
         
-        #power-msg { position: fixed; top: 80px; left: 50%; transform: translateX(-50%); color: #ff0; font-size: 18px; display: none; text-shadow: 0 0 10px #ff0; }
+        .calc-area { height: 45vh; display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; padding-bottom: 75px; }
+        .calc-display { grid-column: span 3; background: #111; color: var(--success); text-align: right; padding: 10px; font-size: 1.8rem; border-radius: 10px; border: 1px solid #333; height: 50px; }
+        .num-btn { background: #1a1a1a; border: 1px solid #333; color: white; border-radius: 10px; font-size: 1.3rem; font-weight: bold; display: flex; align-items: center; justify-content: center; }
+
+        /* MODALES */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 5000; display: none; justify-content: center; align-items: center; padding: 20px; }
+        .lookup-card { background: #111; border: 3px solid var(--success); border-radius: 25px; padding: 30px; width: 100%; text-align: center; }
+        .l-name { color: var(--success); font-size: 2.2rem; font-weight: 900; text-transform: uppercase; }
+        .l-price { color: var(--neon); font-size: 5.5rem; font-weight: 900; margin: 5px 0; font-family: monospace; }
+
+        /* BOTONES */
+        .btn-nav { width: 100%; padding: 16px; border: none; border-radius: 15px; font-weight: bold; color: white; text-transform: uppercase; font-size: 0.9rem; }
+        .btn-back-fixed { position: fixed; bottom: 10px; left: 15px; right: 15px; z-index: 100; background: #222; border: 1px solid #444; color: #aaa; padding: 15px; border-radius: 15px; text-align: center; }
         
-        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+        select, input { width: 100%; padding: 15px; margin: 5px 0; background: #111; color: white; border: 1px solid #444; border-radius: 12px; }
+        .inv-item { background: var(--card); padding: 12px; margin-bottom: 8px; border-radius: 12px; border-left: 4px solid var(--neon); display: flex; justify-content: space-between; align-items: center; }
+        
+        .data-row { display: flex; gap: 10px; margin-top: 5px; }
+        .btn-data { flex: 1; padding: 12px; border-radius: 12px; border: 1px dashed #555; background: #1a1a1a; color: #fff; font-size: 0.7rem; font-weight: bold; }
     </style>
 </head>
 <body>
 
-<div id="start-screen">
-    <h1 style="color: #0ff; text-shadow: 0 0 20px #0ff; text-align:center;">WICHE<br><span style="font-size: 0.6em; color: #fff;">GUERRA ESPACIAL</span></h1>
-    <p style="color: #0ff; letter-spacing: 2px; animation: blink 1s infinite;">TOCA PARA EMPEZAR</p>
-</div>
-
-<div id="boss-ui">
-    <div id="boss-label" style="color:#f00; font-size:14px; margin-bottom:5px; font-weight:bold;">JEFE FINAL: FASE 1</div>
-    <div id="boss-bar-container"><div id="boss-bar"></div></div>
-</div>
-
-<div id="ui">SCORE: <span id="score">00000</span><br>LEVEL: <span id="level">01</span></div>
-<div id="btn-pause">⏸</div>
-<div id="power-msg">¡PODER TRIPLE ACTIVADO!</div>
-
-<div class="controls">
-    <div class="btn-group">
-        <div id="btn-up" class="btn">▲</div>
-        <div id="btn-down" class="btn">▼</div>
+    <div id="scr-home" class="screen" style="justify-content:center; align-items:center;">
+        <h1 style="font-size:3.5rem;">SCANNER</h1>
+        <div style="color:var(--neon); font-weight:bold; margin-bottom:40px;">PRO V6.0</div>
+        <button style="width:180px; height:180px; border-radius:50%; border:5px solid var(--neon); background:none; color:white;" onclick="irA('scr-menu')">INICIAR</button>
     </div>
-    <div class="btn-group">
-        <div id="btn-shoot" class="btn">⚡</div>
+
+    <div id="scr-menu" class="screen hidden">
+        <div class="cam-box" style="flex:0 0 28vh;"><div id="reader-menu"></div></div>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+            <button class="btn-nav" style="background:var(--neon)" onclick="irA('scr-inv')">📋 INVENTARIO / EDITAR</button>
+            <button class="btn-nav" style="background:#222;" onclick="ajustarTasa()">💵 TASA: <span id="tasa-val">0</span> Bs</button>
+            <button class="btn-nav" style="background:#16a34a" onclick="irA('scr-scan')">🛒 MODO ESCANEO</button>
+            <button class="btn-nav" style="background:#444" onclick="irA('scr-ticket')">📄 VER TICKET / CALC</button>
+            <div class="data-row">
+                <button class="btn-data" onclick="exportarData()">📤 EXPORTAR</button>
+                <button class="btn-data" onclick="document.getElementById('fileInput').click()">📥 IMPORTAR</button>
+                <input type="file" id="fileInput" class="hidden" accept=".json" onchange="importarData(event)">
+            </div>
+        </div>
+        <div class="btn-back-fixed" onclick="irA('scr-home')">CERRAR SESIÓN</div>
     </div>
-</div>
 
-<canvas id="gameCanvas"></canvas>
-
-<script>
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
-    
-    let audioCtx = null;
-    let score = 0, gameActive = false, isPaused = false, shake = 0;
-    let player = { x: 80, y: 0, w: 60, h: 40, speed: 6.5, lastShot: 0, powerUp: 0 };
-    let bullets = [], enemies = [], stars = [], bossProjectiles = [], powerUps = [], particles = [];
-    let boss = null;
-
-    function resize() {
-        canvas.width = window.innerWidth; canvas.height = window.innerHeight;
-        player.y = canvas.height / 2;
-        stars = Array.from({length: 70}, () => ({ x: Math.random()*canvas.width, y: Math.random()*canvas.height, s: Math.random()*2+1, sp: Math.random()*3+1 }));
-    }
-    window.addEventListener('resize', resize); resize();
-
-    function initAudio() {
-        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        if (audioCtx.state === 'suspended') audioCtx.resume();
-    }
-
-    function playSound(freq, type, dur, vol) {
-        if(!audioCtx || audioCtx.state !== 'running' || isPaused) return;
-        try {
-            const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
-            osc.type = type; osc.frequency.value = freq;
-            gain.gain.setValueAtTime(vol, audioCtx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + dur);
-            osc.connect(gain); gain.connect(audioCtx.destination);
-            osc.start(); osc.stop(audioCtx.currentTime + dur);
-        } catch(e) {}
-    }
-
-    function createExplosion(x, y, color) {
-        for(let i=0; i<15; i++) {
-            particles.push({
-                x: x, y: y,
-                vx: (Math.random()-0.5)*12,
-                vy: (Math.random()-0.5)*12,
-                life: 1.0,
-                color: color
-            });
-        }
-    }
-
-    function drawPlayer(x, y) {
-        ctx.save();
-        ctx.translate(x, y);
-        ctx.scale(1.2, 1.2);
-        let color = player.powerUp > Date.now() ? '#ff0' : '#0ff';
-        ctx.shadowBlur = 15; ctx.shadowColor = color;
-        ctx.fillStyle = color; ctx.globalAlpha = Math.random();
-        ctx.beginPath(); ctx.moveTo(-5, 12); ctx.lineTo(-20, 15); ctx.lineTo(-5, 18); ctx.fill();
-        ctx.globalAlpha = 1;
-        ctx.strokeStyle = color; ctx.lineWidth = 3;
-        ctx.beginPath(); ctx.moveTo(5, 0); ctx.lineTo(20, 15); ctx.lineTo(5, 30); ctx.stroke();
-        ctx.fillStyle = "#001a1a";
-        ctx.beginPath(); ctx.moveTo(0, 10); ctx.lineTo(45, 15); ctx.lineTo(0, 20); ctx.closePath();
-        ctx.fill(); ctx.stroke();
-        ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
-        ctx.beginPath(); ctx.ellipse(15, 15, 10, 5, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.restore();
-    }
-
-    const bind = (id, fn) => {
-        const el = document.getElementById(id);
-        el.addEventListener('pointerdown', e => { e.preventDefault(); fn(true); });
-        el.addEventListener('pointerup', e => { e.preventDefault(); fn(false); });
-    };
-    let mvUp = false, mvDown = false, isShooting = false;
-    bind('btn-up', v => mvUp = v); bind('btn-down', v => mvDown = v); bind('btn-shoot', v => isShooting = v);
-
-    // Lógica del botón de pausa corregida
-    document.getElementById('btn-pause').onclick = function(e) {
-        e.stopPropagation();
-        isPaused = !isPaused;
-        this.innerText = isPaused ? '▶️' : '⏸';
-    };
-
-    document.getElementById('start-screen').addEventListener('click', function() {
-        initAudio();
-        this.style.display = 'none'; 
-        if (!gameActive) { gameActive = true; requestAnimationFrame(loop); }
-    });
-
-    function gameOver() {
-        gameActive = false;
-        shake = 40;
-        playSound(50, 'sawtooth', 1.2, 0.6);
-        createExplosion(player.x, player.y, '#f00');
-        setTimeout(() => { alert("GAME OVER - SCORE: " + score); location.reload(); }, 300);
-    }
-
-    function update() {
-        if (!gameActive || isPaused) return;
-        if (shake > 0) shake *= 0.9;
+    <div id="scr-scan" class="screen hidden">
+        <div class="cam-box"><div id="reader-scan"></div></div>
         
-        if (score > 0 && score % 10000 === 0 && !boss) {
-            boss = { x: canvas.width + 150, y: canvas.height/2, hp: 60, maxHp: 60, phase: 1, lastShot: 0 };
-            document.getElementById('boss-ui').style.display = 'block';
+        <div id="scan-indicator" class="scan-counter">
+            <span>ARTÍCULOS: <span id="scan-qty">0</span></span>
+            <span>TOTAL: $<span id="scan-total">0.00</span></span>
+        </div>
+
+        <button class="btn-nav" style="background:#16a34a; position:fixed; bottom:75px; left:15px; width:calc(100% - 30px);" onclick="irA('scr-ticket')">IR AL TICKET</button>
+        <div class="btn-back-fixed" onclick="irA('scr-menu')">VOLVER AL MENÚ</div>
+    </div>
+
+    <div id="scr-ticket" class="screen hidden">
+        <div class="ticket-area">
+            <div id="lista-ticket" class="receipt-list"></div>
+            <div id="total-ticket" style="padding:10px; background:#eee; text-align:right; font-weight:bold;">$0.00 | 0.00 Bs</div>
+        </div>
+        <div class="calc-area">
+            <div id="calc-screen" class="calc-display">0</div>
+            <button class="num-btn" onclick="numKey('7')">7</button><button class="num-btn" onclick="numKey('8')">8</button><button class="num-btn" onclick="numKey('9')">9</button>
+            <button class="num-btn" onclick="numKey('4')">4</button><button class="num-btn" onclick="numKey('5')">5</button><button class="num-btn" onclick="numKey('6')">6</button>
+            <button class="num-btn" onclick="numKey('1')">1</button><button class="num-btn" onclick="numKey('2')">2</button><button class="num-btn" onclick="numKey('3')">3</button>
+            <button class="num-btn" onclick="numKey('.')">.</button><button class="num-btn" onclick="numKey('0')">0</button><button class="num-btn" style="background:var(--neon)" onclick="numKey('C')">C</button>
+            <button class="num-btn" style="grid-column: span 2; background:#16a34a;" onclick="addManual()">SUMAR (+)</button>
+            <button class="num-btn" style="background:#444;" onclick="if(confirm('¿Limpiar ticket?')) { venta = []; updateTicketUI(); }">🗑️</button>
+        </div>
+        <div class="btn-back-fixed" onclick="irA('scr-scan')">VOLVER A ESCANEAR</div>
+    </div>
+
+    <div id="scr-inv" class="screen hidden">
+        <div style="display:flex; gap:5px;">
+            <button class="btn-nav" style="background:var(--neon); flex:1;" onclick="nuevaCat()">+ CATEGORÍA</button>
+            <button class="btn-nav" style="background:#444; width:60px;" onclick="borrarCatActual()">🗑️</button>
+        </div>
+        <select id="filtro-cat" onchange="renderInv()"></select>
+        <div id="inv-list" style="flex:1; overflow-y:auto; margin-top:10px;"></div>
+        <div class="btn-back-fixed" onclick="irA('scr-menu')">VOLVER AL MENÚ</div>
+    </div>
+
+    <div id="lookup-modal" class="modal-overlay" onclick="cerrarModal('lookup-modal')">
+        <div class="lookup-card">
+            <div id="l-name" class="l-name">PRODUCTO</div>
+            <div id="l-price" class="l-price">$0.00</div>
+            <div id="l-bs" style="color:#555; font-size:1.5rem;">0.00 Bs</div>
+        </div>
+    </div>
+
+    <div id="reg-modal" class="modal-overlay">
+        <div class="lookup-card" style="border-color:var(--neon); text-align:left;">
+            <h2 id="modal-title" style="color:var(--neon); margin:0 0 15px 0;">REGISTRAR</h2>
+            <input type="text" id="m-nom" placeholder="Nombre">
+            <input type="number" id="m-pre" placeholder="Precio $" step="0.01">
+            <select id="m-cat"></select>
+            <div style="display:flex; gap:10px; margin-top:20px;">
+                <button class="btn-nav" style="background:#444; flex:1;" onclick="cerrarModal('reg-modal')">X</button>
+                <button class="btn-nav" style="background:var(--neon); flex:1;" onclick="saveProd()">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const DB_NAME = 'SCAN_DB_V6.0';
+        let DB = JSON.parse(localStorage.getItem(DB_NAME)) || { productos: {}, cats: ["General"], tasa: 36.5 };
+        let html5QrCode = null, venta = [], calcInput = "0", isProcessing = false, currentId = null;
+
+        async function irA(id) {
+            if (html5QrCode) { try { await html5QrCode.stop(); html5QrCode = null; } catch(e) {} }
+            document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+            document.getElementById(id).classList.remove('hidden');
+            if (id === 'scr-menu') startCam("reader-menu", true);
+            if (id === 'scr-scan') { startCam("reader-scan", false); updateScanIndicator(); }
+            if (id === 'scr-ticket') updateTicketUI();
+            if (id === 'scr-inv') renderInv();
+            document.getElementById('tasa-val').innerText = DB.tasa.toFixed(2);
         }
 
-        stars.forEach(s => { s.x -= s.sp; if(s.x < 0) s.x = canvas.width; });
-        if (mvUp && player.y > 20) player.y -= player.speed;
-        if (mvDown && player.y < canvas.height - 50) player.y += player.speed;
-
-        if (isShooting && Date.now() - player.lastShot > (player.powerUp > Date.now() ? 120 : 250)) {
-            bullets.push({ x: player.x + 40, y: player.y + 15, vy: 0 });
-            if(player.powerUp > Date.now()) {
-                bullets.push({ x: player.x + 40, y: player.y + 15, vy: -3 });
-                bullets.push({ x: player.x + 40, y: player.y + 15, vy: 3 });
-            }
-            // SONIDO DE DISPARO ELIMINADO
-            player.lastShot = Date.now();
-        }
-
-        bullets.forEach((b, i) => {
-            b.x += 20; b.y += b.vy;
-            if (boss && Math.hypot(b.x - boss.x, b.y - boss.y) < 60) {
-                boss.hp--; bullets.splice(i, 1); shake = 8;
-                createExplosion(b.x, b.y, '#f00');
-                document.getElementById('boss-bar').style.width = (boss.hp / boss.maxHp * 100) + "%";
-            }
-            if (b.x > canvas.width) bullets.splice(i, 1);
-        });
-
-        if (boss) {
-            if (boss.x > canvas.width - 160) boss.x -= 1.5;
-            boss.y += Math.sin(Date.now() / 800) * (boss.phase === 2 ? 8 : 4);
-            if (Date.now() - boss.lastShot > (boss.phase === 2 ? 600 : 1500)) {
-                bossProjectiles.push({ x: boss.x - 50, y: boss.y, vx: boss.phase === 2 ? -12 : -7 });
-                boss.lastShot = Date.now();
-                playSound(150, 'sawtooth', 0.2, 0.05);
-            }
-            if (boss.hp <= 0) {
-                createExplosion(boss.x, boss.y, '#f00');
-                powerUps.push({x: boss.x, y: boss.y});
-                score += 3000; boss = null; shake = 40;
-                document.getElementById('boss-ui').style.display = 'none';
-                playSound(40, 'square', 1.0, 0.4);
-            }
-        } else {
-            if (Math.random() < 0.03) {
-                enemies.push({ 
-                    x: canvas.width + 50, 
-                    y: Math.random()*(canvas.height-100)+50, 
-                    sp: 5 + (score/3000),
-                    amp: Math.random() < 0.4 ? 4 : 0, 
-                    offset: Math.random() * 10,
-                    rotation: 0 // Nueva propiedad para la rotación
+        async function startCam(divId, isMenu) {
+            isProcessing = false;
+            html5QrCode = new Html5Qrcode(divId);
+            try {
+                await html5QrCode.start({ facingMode: "environment" }, { fps: 20, qrbox: 250 }, (code) => {
+                    if (isProcessing) return;
+                    const p = DB.productos[code];
+                    if (isMenu) {
+                        isProcessing = true;
+                        if (p) {
+                            document.getElementById('l-name').innerText = p.nombre;
+                            document.getElementById('l-price').innerText = "$" + p.precio.toFixed(2);
+                            document.getElementById('l-bs').innerText = (p.precio * DB.tasa).toFixed(2) + " Bs";
+                            document.getElementById('lookup-modal').style.display = 'flex';
+                        } else { openEditor(code); }
+                    } else if (p) {
+                        venta.push({ id: code, nombre: p.nombre, precio: p.precio });
+                        if (navigator.vibrate) navigator.vibrate(50);
+                        updateScanIndicator();
+                        isProcessing = true; setTimeout(() => isProcessing = false, 1200);
+                    }
                 });
+            } catch (e) {}
+        }
+
+        function updateScanIndicator() {
+            const total = venta.reduce((acc, item) => acc + item.precio, 0);
+            document.getElementById('scan-qty').innerText = venta.length;
+            document.getElementById('scan-total').innerText = total.toFixed(2);
+        }
+
+        function openEditor(code, isEdit = false) {
+            currentId = code;
+            const p = DB.productos[code] || { nombre: "", precio: "", cat: "General" };
+            document.getElementById('modal-title').innerText = isEdit ? "EDITAR" : "REGISTRAR";
+            document.getElementById('m-nom').value = p.nombre;
+            document.getElementById('m-pre').value = p.precio;
+            document.getElementById('m-cat').innerHTML = DB.cats.map(c => `<option value="${c}" ${c===p.cat?'selected':''}>${c}</option>`).join('');
+            document.getElementById('reg-modal').style.display = 'flex';
+        }
+
+        function saveProd() {
+            const n = document.getElementById('m-nom').value.trim(), p = document.getElementById('m-pre').value;
+            if(!n || !p) return;
+            DB.productos[currentId] = { nombre: n, precio: parseFloat(p), cat: document.getElementById('m-cat').value };
+            localStorage.setItem(DB_NAME, JSON.stringify(DB));
+            cerrarModal('reg-modal');
+            renderInv();
+        }
+
+        function cerrarModal(id) { document.getElementById(id).style.display = 'none'; isProcessing = false; }
+        
+        // GESTIÓN
+        function nuevaCat() { 
+            let n = prompt("Nombre categoría:"); 
+            if(n) { DB.cats.push(n); localStorage.setItem(DB_NAME, JSON.stringify(DB)); renderInv(); } 
+        }
+
+        function borrarCatActual() {
+            const c = document.getElementById('filtro-cat').value;
+            if(c === "Todas" || c === "General") return;
+            if(confirm(`¿Borrar categoría "${c}"?`)) {
+                Object.values(DB.productos).forEach(p => { if(p.cat === c) p.cat = "General"; });
+                DB.cats = DB.cats.filter(x => x !== c);
+                localStorage.setItem(DB_NAME, JSON.stringify(DB));
+                renderInv();
             }
         }
 
-        particles.forEach((p, i) => {
-            p.x += p.vx; p.y += p.vy; p.life -= 0.03;
-            if(p.life <= 0) particles.splice(i, 1);
-        });
-
-        enemies.forEach((e, i) => {
-            e.x -= e.sp;
-            e.y += Math.sin(Date.now() / 200 + e.offset) * e.amp;
-            e.rotation += 0.1; // Los enemigos giran
-
-            if (Math.hypot(player.x - e.x, player.y - e.y) < 35) gameOver();
-            bullets.forEach((b, bi) => {
-                if (Math.hypot(b.x - e.x, b.y - e.y) < 30) { 
-                    shake = 6;
-                    createExplosion(e.x, e.y, '#f0f');
-                    enemies.splice(i, 1); bullets.splice(bi, 1); 
-                    score += 100; // PUNTUACIÓN SUBIDA A 100
-                    playSound(300, 'sine', 0.05, 0.02);
+        function renderInv() {
+            const f = document.getElementById('filtro-cat').value || "Todas";
+            document.getElementById('filtro-cat').innerHTML = `<option value="Todas">Ver Todas</option>` + DB.cats.map(c => `<option value="${c}" ${c===f?'selected':''}>${c}</option>`).join('');
+            let html = "";
+            Object.keys(DB.productos).forEach(id => {
+                const p = DB.productos[id];
+                if (f === "Todas" || p.cat === f) {
+                    html += `<div class="inv-item"><div onclick="openEditor('${id}', true)" style="flex:1"><b>${p.nombre}</b><br><small>$${p.precio.toFixed(2)}</small></div><button style="color:var(--neon);border:none;background:none;" onclick="borrarProd('${id}')">X</button></div>`;
                 }
             });
-            if(e.x < -50) enemies.splice(i, 1);
-        });
-
-        bossProjectiles.forEach((p, i) => { 
-            p.x += p.vx; 
-            if(Math.hypot(player.x - p.x, player.y - p.y) < 25) gameOver();
-            if(p.x < -50) bossProjectiles.splice(i, 1);
-        });
-
-        powerUps.forEach((p, i) => {
-            p.x -= 3;
-            if(Math.hypot(player.x - p.x, player.y - p.y) < 40) {
-                player.powerUp = Date.now() + 10000; powerUps.splice(i,1);
-                document.getElementById('power-msg').style.display = 'block';
-                setTimeout(()=> document.getElementById('power-msg').style.display='none', 3000);
-                playSound(800, 'sine', 0.6, 0.2);
-            }
-        });
-
-        document.getElementById('score').innerText = score.toString().padStart(5, '0');
-        document.getElementById('level').innerText = Math.floor(score/5000 + 1).toString().padStart(2, '0');
-    }
-
-    function draw() {
-        ctx.fillStyle = '#000814'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.save(); 
-        if(shake > 0) ctx.translate(Math.random()*shake - shake/2, Math.random()*shake - shake/2);
-        
-        ctx.fillStyle = '#fff'; stars.forEach(s => ctx.fillRect(s.x, s.y, s.s, s.s));
-
-        particles.forEach(p => {
-            ctx.fillStyle = p.color; ctx.globalAlpha = p.life;
-            ctx.fillRect(p.x, p.y, 3, 3);
-        });
-        ctx.globalAlpha = 1;
-        
-        bullets.forEach(b => {
-            ctx.fillStyle = player.powerUp > Date.now() ? '#ff0' : '#0ff';
-            ctx.fillRect(b.x, b.y, 15, 4);
-        });
-
-        // ENEMIGOS CON ROTACIÓN
-        enemies.forEach(e => {
-            ctx.save();
-            ctx.translate(e.x, e.y);
-            ctx.rotate(e.rotation); // APLICAR ROTACIÓN
-            ctx.strokeStyle = '#f0f'; ctx.lineWidth = 2; ctx.shadowBlur = 10; ctx.shadowColor = '#f0f';
-            ctx.beginPath();
-            for(let i=0; i<8; i++) {
-                let rot = (Math.PI * 2 / 8) * i;
-                ctx.lineTo(Math.cos(rot) * 20, Math.sin(rot) * 20);
-                ctx.lineTo(Math.cos(rot + 0.4) * 12, Math.sin(rot + 0.4) * 12);
-            }
-            ctx.closePath(); ctx.stroke();
-            ctx.beginPath(); ctx.arc(0, 0, 10, 0, Math.PI*2); ctx.fillStyle = '#000'; ctx.fill(); ctx.stroke();
-            // El ojo se mantiene rotando con el cuerpo
-            ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(-2, 0, 5, 0, Math.PI*2); ctx.fill();
-            ctx.fillStyle = '#f0f'; ctx.beginPath(); ctx.arc(-3, 0, 2, 0, Math.PI*2); ctx.fill();
-            ctx.restore();
-        });
-
-        if(boss) {
-            ctx.strokeStyle = '#f00'; ctx.lineWidth = 4; ctx.shadowBlur = 20; ctx.shadowColor = '#f00';
-            ctx.strokeRect(boss.x - 50, boss.y - 50, 100, 100);
-            ctx.strokeRect(boss.x - 30, boss.y - 30, 60, 60);
+            document.getElementById('inv-list').innerHTML = html;
         }
 
-        bossProjectiles.forEach(p => {
-            ctx.fillStyle = '#f00'; ctx.shadowBlur = 15; ctx.beginPath(); ctx.arc(p.x, p.y, 10, 0, Math.PI*2); ctx.fill();
-        });
+        function borrarProd(id) { if(confirm("¿Eliminar?")) { delete DB.productos[id]; localStorage.setItem(DB_NAME, JSON.stringify(DB)); renderInv(); } }
 
-        drawPlayer(player.x, player.y);
-        ctx.restore();
-    }
+        function exportarData() {
+            const f = new Date();
+            const nombre = `inv_${f.getDate()}-${f.getMonth()+1}.json`;
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(DB));
+            const dl = document.createElement('a');
+            dl.setAttribute("href", dataStr); dl.setAttribute("download", nombre);
+            dl.click();
+        }
 
-    function loop() {
-        update();
-        draw();
-        if(gameActive) requestAnimationFrame(loop);
-    }
-</script>
+        function importarData(e) {
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                try {
+                    const data = JSON.parse(ev.target.result);
+                    if(data.productos) { DB = data; localStorage.setItem(DB_NAME, JSON.stringify(DB)); location.reload(); }
+                } catch(err) { alert("Error"); }
+            };
+            reader.readAsText(e.target.files[0]);
+        }
+
+        function numKey(val) {
+            if (val === 'C') calcInput = "0";
+            else if (val === '.') { if (!calcInput.includes('.')) calcInput += '.'; }
+            else { calcInput = calcInput === "0" ? val : calcInput + val; }
+            document.getElementById('calc-screen').innerText = calcInput;
+        }
+        function addManual() {
+            let m = parseFloat(calcInput);
+            if (m > 0) { venta.push({ id: 'man-'+Date.now(), nombre: 'Manual', precio: m }); updateTicketUI(); numKey('C'); }
+        }
+        function updateTicketUI() {
+            const lista = document.getElementById('lista-ticket');
+            const agrupados = venta.reduce((acc, item) => {
+                const key = item.nombre === 'Manual' ? item.id : item.id;
+                if (!acc[key]) acc[key] = { ...item, qty: 0, subtotal: 0 };
+                acc[key].qty++; acc[key].subtotal += item.precio;
+                return acc;
+            }, {});
+            let html = "", total = 0;
+            Object.values(agrupados).forEach(p => {
+                total += p.subtotal;
+                html += `<div class="receipt-row"><div><b>${p.nombre}</b> ${p.qty>1?'x'+p.qty:''}</div><div>$${p.subtotal.toFixed(2)} <button style="color:red;border:none;background:none;font-weight:bold;" onclick="eliminarUno('${p.id}')">X</button></div></div>`;
+            });
+            lista.innerHTML = html;
+            document.getElementById('total-ticket').innerText = `$${total.toFixed(2)} | ${(total * DB.tasa).toFixed(2)} Bs`;
+        }
+        function eliminarUno(id) { const idx = venta.findIndex(x => x.id === id); if (idx > -1) { venta.splice(idx, 1); updateTicketUI(); } }
+        function ajustarTasa() { let t = prompt("Tasa:", DB.tasa); if(t) { DB.tasa = parseFloat(t); localStorage.setItem(DB_NAME, JSON.stringify(DB)); document.getElementById('tasa-val').innerText = DB.tasa.toFixed(2); } }
+    </script>
 </body>
 </html>
